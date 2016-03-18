@@ -1,6 +1,6 @@
 package com.home.sim;
 
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+import com.home.sim.apps.BaseApp;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -49,10 +49,13 @@ public class Host {
         }
     }
 
-    public String sendMessage(String toAddress,String content) throws Exception {
-        Message message = new Message(getAddress(),toAddress,content);
+    public String sendMessage(String toAddress, String content) throws Exception {
+        Message message = new Message(getAddress(), toAddress, content);
         Message reply = sendMessage(message);
-        if(reply.isException()){
+        if (reply.isException()) {
+            if (reply.isTimeout()) {
+                throw new TimeoutException(reply.getContent(), toAddress, content);
+            }
             throw new Exception("Exception returned: " + reply.getContent());
         }
         return reply.getContent();
@@ -61,7 +64,7 @@ public class Host {
     public Message sendMessage(Message message) {
         network.sentMessage(message);
 
-        CompletableFuture<Message> futureReply = CompletableFuture.supplyAsync(() -> listenForReply(message.getId(), 60000));
+        CompletableFuture<Message> futureReply = CompletableFuture.supplyAsync(() -> listenForReply(message.getId(), 2000));
 
         try {
             return futureReply.get();
@@ -74,11 +77,11 @@ public class Host {
         throw new IllegalStateException("There should have been a reply!");
     }
 
-    private Message listenForReply(String messageId, long maxTimeoutMilliseconds){
+    private Message listenForReply(String messageId, long maxTimeoutMilliseconds) {
         Instant start = Instant.now();
-        while(Duration.between(start,Instant.now()).toMillis() < maxTimeoutMilliseconds){
+        while (Duration.between(start, Instant.now()).toMillis() < maxTimeoutMilliseconds) {
             Message reply = replies.remove(messageId);
-            if(reply!=null){
+            if (reply != null) {
                 return reply;
             }
             try {
@@ -98,10 +101,10 @@ public class Host {
             return null;
         } else {
             String response = app.handle(message.getContent());
-            if(BaseApp.METHOD_NOT_FOUND.equals(response)){
+            if (BaseApp.METHOD_NOT_FOUND.equals(response)) {
                 return message.getReturnException(BaseApp.METHOD_NOT_FOUND);
             } else {
-              return message.getReturnMessage(response);
+                return message.getReturnMessage(response);
             }
 
         }

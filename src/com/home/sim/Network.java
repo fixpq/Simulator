@@ -15,8 +15,19 @@ public class Network {
 
     private HashMap<String, Host> hosts = new HashMap<>();
 
+    //used to simulate a network split
+    private HashMap<String, Host> isolatedHost = new HashMap<>();
+
     public void addHost(Host host){
         hosts.put(host.getAddress(),host);
+    }
+
+    public void isolateHost(Host host){
+        isolatedHost.put(host.getAddress(),host);
+    }
+
+    public void remoteFromIsolation(Host host){
+        isolatedHost.remove(host.getAddress());
     }
 
     public Host getHost(String address){
@@ -29,7 +40,13 @@ public class Network {
         if(message == null){
             return;
         }
+        if(isolatedHost.containsKey(message.getFrom()) || isolatedHost.containsKey(message.getTo())){
+            return;
+        }
+
+        Host source = hosts.get(message.getFrom());
         Host dest =  hosts.get(message.getTo());
+
         if(dest==null){
             sentMessage(message.getReturnException("destination not found: " + message.getTo()));
             return ;
