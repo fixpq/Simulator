@@ -1,5 +1,6 @@
 package com.home.sim;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
@@ -34,6 +35,10 @@ public class Network {
         return hosts.get(address);
     }
 
+    public List<Host> getAllHosts(){
+        return new ArrayList<>(hosts.values());
+    }
+
 
     public void sentMessage(Message message){
 
@@ -54,6 +59,11 @@ public class Network {
 
         executor.submit(() -> {
             try {
+                //simulate 1% failure rate
+                boolean shouldFail = Math.abs(random.nextInt() % 100) >= 99;
+                if(shouldFail){
+                    return;
+                }
                 //simulate network latency
                 int millis = Math.max(Math.abs(random.nextInt() % 20),2);
                 Thread.sleep(millis);

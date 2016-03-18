@@ -156,4 +156,8 @@ public class Host {
     public String toString() {
         return address;
     }
+
+    public BaseApp getApp() {
+        return app;
+    }
 }
