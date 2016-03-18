@@ -45,9 +45,6 @@ public class Network {
         if(message == null){
             return;
         }
-        if(isolatedHost.containsKey(message.getFrom()) || isolatedHost.containsKey(message.getTo())){
-            return;
-        }
 
         Host source = hosts.get(message.getFrom());
         Host dest =  hosts.get(message.getTo());
@@ -57,10 +54,14 @@ public class Network {
             return ;
         }
 
+        if(isolatedHost.containsKey(message.getFrom()) || isolatedHost.containsKey(message.getTo())){
+            return;
+        }
+
         executor.submit(() -> {
             try {
-                //simulate 1% failure rate
-                boolean shouldFail = Math.abs(random.nextInt() % 100) >= 99;
+                //simulate 0.1% failure rate
+                boolean shouldFail = Math.abs(random.nextInt() % 1000) >= 999;
                 if(shouldFail){
                     return;
                 }
