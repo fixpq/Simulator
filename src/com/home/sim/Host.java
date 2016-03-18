@@ -11,6 +11,7 @@ import java.util.concurrent.*;
  */
 public class Host {
     private final String address;
+    private final BaseApp app;
     private Thread thread;
     private final Network network;
     private ConcurrentLinkedQueue<Message> messages = new ConcurrentLinkedQueue<>();
@@ -20,8 +21,11 @@ public class Host {
         return address;
     }
 
-    public Host(String address, Network network) {
+
+    public Host(String address, BaseApp app, Network network) {
         this.address = address;
+        this.app = app;
+        this.app.setHost(this);
         this.network = network;
     }
 
@@ -43,6 +47,15 @@ public class Host {
         } else {
             messages.add(message);
         }
+    }
+
+    public String sendMessage(String toAddress,String content) throws Exception {
+        Message message = new Message(getAddress(),toAddress,content);
+        Message reply = sendMessage(message);
+        if(reply.isException()){
+            throw new Exception("Exception returned: " + reply.getContent());
+        }
+        return reply.getContent();
     }
 
     public Message sendMessage(Message message) {
@@ -84,7 +97,13 @@ public class Host {
             writeToConsole(message.getFrom() + " " + message.getContent());
             return null;
         } else {
-            throw new NotImplementedException();
+            String response = app.handle(message.getContent());
+            if(BaseApp.METHOD_NOT_FOUND.equals(response)){
+                return message.getReturnException(BaseApp.METHOD_NOT_FOUND);
+            } else {
+              return message.getReturnMessage(response);
+            }
+
         }
     }
 
@@ -107,6 +126,7 @@ public class Host {
             }
         });
         thread.start();
+        this.app.start();
     }
 
     public void writeToConsole(String message) {
