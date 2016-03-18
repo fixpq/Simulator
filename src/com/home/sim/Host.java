@@ -101,8 +101,8 @@ public class Host {
             return null;
         } else {
             String response = app.handle(message.getContent());
-            if (BaseApp.METHOD_NOT_FOUND.equals(response)) {
-                return message.getReturnException(BaseApp.METHOD_NOT_FOUND);
+            if (response.startsWith(BaseApp.METHOD_NOT_FOUND)) {
+                return message.getReturnException(response);
             } else {
                 return message.getReturnMessage(response);
             }
