@@ -5,15 +5,24 @@ import com.home.sim.apps.BaseApp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 /**
  * Created by Filip on 3/17/2016.
  */
 public class Host {
     private final String address;
-    private final BaseApp app;
+    //the app running on this host
+    private BaseApp app;
+    private final Supplier<BaseApp> appFactory;
+    private int networkCommunicationTimeoutMs = 2000;
+
+    private AtomicBoolean running = new AtomicBoolean(false);
+
     private Thread thread;
     private final Network network;
+
     private ConcurrentLinkedQueue<Message> messages = new ConcurrentLinkedQueue<>();
     private ConcurrentHashMap<String, Message> replies = new ConcurrentHashMap<>();
 
@@ -22,10 +31,9 @@ public class Host {
     }
 
 
-    public Host(String address, BaseApp app, Network network) {
+    public Host(String address, Supplier<BaseApp> appFactory, Network network) {
         this.address = address;
-        this.app = app;
-        this.app.setHost(this);
+        this.appFactory = appFactory;
         this.network = network;
     }
 
@@ -64,7 +72,8 @@ public class Host {
     public Message sendMessage(Message message) {
         network.sentMessage(message);
 
-        CompletableFuture<Message> futureReply = CompletableFuture.supplyAsync(() -> listenForReply(message.getId(), 2000));
+        CompletableFuture<Message> futureReply = CompletableFuture.supplyAsync(() -> listenForReply(message.getId(),
+                getNetworkCommunicationTimeoutMs()));
 
         try {
             return futureReply.get();
@@ -77,6 +86,14 @@ public class Host {
         throw new IllegalStateException("There should have been a reply!");
     }
 
+    public int getNetworkCommunicationTimeoutMs() {
+        return networkCommunicationTimeoutMs;
+    }
+
+    public void setNetworkCommunicationTimeoutMs(int value){
+        this.networkCommunicationTimeoutMs = value;
+    }
+
     private Message listenForReply(String messageId, long maxTimeoutMilliseconds) {
         Instant start = Instant.now();
         while (Duration.between(start, Instant.now()).toMillis() < maxTimeoutMilliseconds) {
@@ -85,11 +102,12 @@ public class Host {
                 return reply;
             }
             try {
-                Thread.sleep(10L);
+                Thread.sleep(2L);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
         }
+
         return Message.getTimeoutReplay(messageId);
     }
 
@@ -110,7 +128,20 @@ public class Host {
         }
     }
 
+    public void stop() {
+        if (running.compareAndSet(true, false)) {
+            app.stop();
+            app = null;
+            this.messages.clear();
+            this.replies.clear();
+        }
+
+    }
+
     public void start() {
+        if (!running.compareAndSet(false, true)) {
+            return;
+        }
         if (thread != null) {
             throw new IllegalStateException("Host already started");
         }
@@ -118,7 +149,7 @@ public class Host {
         thread = new Thread(new Runnable() {
             @Override
             public void run() {
-                while (true) {
+                while (running.get()) {
                     Message message = messages.poll();
                     if (message == null) {
                         continue;
@@ -129,6 +160,8 @@ public class Host {
             }
         });
         thread.start();
+        this.app = this.appFactory.get();
+        this.app.setHost(this);
         this.app.start();
     }
 
